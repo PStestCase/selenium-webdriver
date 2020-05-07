@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <style>body {
+	font-family: Helvetica, Arial, sans-serif;
+	font-size: 12px;
+	/* do not increase min-width as some may use split screens */
+	min-width: 800px;
+	color: #999;
+}
+
+h1 {
+	font-size: 24px;
+	color: black;
+}
+
+h2 {
+	font-size: 16px;
+	color: black;
+}
+
+p {
+    color: black;
+}
+
+a {
+	color: #999;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+
+#environment td {
+	padding: 5px;
+	border: 1px solid #E6E6E6;
+}
+
+#environment tr:nth-child(odd) {
+	background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed, .passed .col-result {
+	color: green;
+}
+span.skipped, span.xfailed, span.rerun, .skipped .col-result, .xfailed .col-result, .rerun .col-result {
+	color: orange;
+}
+span.error, span.failed, span.xpassed, .error .col-result, .failed .col-result, .xpassed .col-result  {
+	color: red;
+}
+
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+
+#results-table {
+	border: 1px solid #e6e6e6;
+	color: #999;
+	font-size: 12px;
+	width: 100%
+}
+
+#results-table th, #results-table td {
+	padding: 5px;
+	border: 1px solid #E6E6E6;
+	text-align: left
+}
+#results-table th {
+	font-weight: bold
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+
+.log:only-child {
+	height: inherit
+}
+.log {
+	background-color: #e6e6e6;
+	border: 1px solid #e6e6e6;
+	color: black;
+	display: block;
+	font-family: "Courier New", Courier, monospace;
+	height: 230px;
+	overflow-y: scroll;
+	padding: 5px;
+	white-space: pre-wrap
+}
+div.image {
+	border: 1px solid #e6e6e6;
+	float: right;
+	height: 240px;
+	margin-left: 5px;
+	overflow: hidden;
+	width: 320px
+}
+div.image img {
+	width: 320px
+}
+div.video {
+	border: 1px solid #e6e6e6;
+	float: right;
+	height: 240px;
+	margin-left: 5px;
+	overflow: hidden;
+	width: 320px
+}
+div.video video {
+	overflow: hidden;
+	width: 320px;
+    height: 240px;
+}
+.collapsed {
+	display: none;
+}
+.expander::after {
+	content: " (show details)";
+	color: #BBB;
+	font-style: italic;
+	cursor: pointer;
+}
+.collapser::after {
+	content: " (hide details)";
+	color: #BBB;
+	font-style: italic;
+	cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+	cursor: pointer;
+}
+
+.sort-icon {
+	font-size: 0px;
+	float: left;
+	margin-right: 5px;
+	margin-top: 5px;
+	/*triangle*/
+	width: 0;
+	height: 0;
+	border-left: 8px solid transparent;
+	border-right: 8px solid transparent;
+}
+
+.inactive .sort-icon {
+	/*finish triangle*/
+	border-top: 8px solid #E6E6E6;
+}
+
+.asc.active .sort-icon {
+	/*finish triangle*/
+	border-bottom: 8px solid #999;
+}
+
+.desc.active .sort-icon {
+	/*finish triangle*/
+	border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (extras.classList.contains("collapsed")) {
+            expandcollapse.classList.add("expander")
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    sort_column(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+
+        if (key_a == key_b) return 0;
+
+        if (reversed) {
+            return (key_a < key_b ? 1 : -1);
+        } else {
+            return (key_a > key_b ? 1 : -1);
+        }
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 01-May-2020 at 09:37:21 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v2.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Base URL</td>
+        <td></td></tr>
+      <tr>
+        <td>Capabilities</td>
+        <td>{}</td></tr>
+      <tr>
+        <td>Driver</td>
+        <td>None</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.8.1", "pytest": "5.4.1"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>macOS-10.15.4-x86_64-i386-64bit</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"base-url": "1.4.1", "cov": "2.8.1", "excel": "1.2.3", "html": "2.1.1", "metadata": "1.8.0", "selenium": "1.17.0", "variables": "1.9.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.8.1</td></tr></table>
+    <h2>Summary</h2>
+    <p>125 tests ran in 11.35 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">97 passed</span>, <input checked="true" class="filter" data-test-result="skipped" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">2 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">28 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_buffering</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_buffering&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_buffering(self):<br/>        with xmlfile(self._file, buffered=False) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>&gt;               self.assertXml(&quot;&lt;test&gt;&quot;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:167: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_buffering&gt;, expected = &#x27;&lt;test&gt;&#x27;, encoding = &#x27;utf8&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In example: EndTag: &#x27;&lt;/&#x27; not found, line 1, column 7 (&lt;string&gt;, line 1)</span><br/><span class="error">E         In actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;Got nothing</span><br/><span class="error">E         </span><br/><span class="error">E       assert &quot;In example: EndTag: &#x27;&lt;/&#x27; not found, line 1, column 7 (&lt;string&gt;, line 1)\nIn actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;Got nothing\n&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_closing_out_of_order_in_error_case</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_closing_out_of_order_in_error_case&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_closing_out_of_order_in_error_case(self):<br/>        cm_exit = None<br/>        try:<br/>            with xmlfile(self._file) as xf:<br/>                x = xf.element(&#x27;test&#x27;)<br/>                cm_exit = x.__exit__<br/>                x.__enter__()<br/>                raise ValueError(&#x27;123&#x27;)<br/>        except ValueError:<br/>            self.assertTrue(cm_exit)<br/>            try:<br/>                cm_exit(ValueError, ValueError(&quot;huhu&quot;), None)<br/>            except LxmlSyntaxError:<br/>                self.assertTrue(True)<br/>            else:<br/>&gt;               self.assertTrue(False)<br/><span class="error">E               AssertionError: False is not true</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:242: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_comment</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_comment&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_comment(self):<br/>        with xmlfile(self._file) as xf:<br/>&gt;           xf.write(etree.Comment(&#x27;a comment&#x27;))<br/><span class="error">E           NameError: name &#x27;etree&#x27; is not defined</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:137: NameError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_encoding</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_encoding&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_encoding(self):<br/>        with xmlfile(self._file, encoding=&#x27;utf16&#x27;) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>                xf.write(&#x27;toast&#x27;)<br/>&gt;       self.assertXml(&#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding=&#x27;utf16&#x27;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:161: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_encoding&gt;, expected = &#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding = &#x27;utf16&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;toast&lt;/test&gt;Got:</span><br/><span class="error">E             琼獥㹴潴獡㱴琯獥㹴</span><br/><span class="error">E       assert &quot;In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;toast&lt;/test&gt;Got:\n    琼獥㹴潴獡㱴琯獥㹴&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_flush</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_flush&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_flush(self):<br/>        with xmlfile(self._file, buffered=True) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>&gt;               self.assertXml(&quot;&quot;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:184: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_flush&gt;, expected = &#x27;&#x27;, encoding = &#x27;utf8&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In example: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         In actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected nothing</span><br/><span class="error">E         Got nothing</span><br/><span class="error">E         </span><br/><span class="error">E       assert &#x27;In example: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nIn actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nExpected nothing\nGot nothing\n&#x27; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_pi</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile._XmlFileTestCaseBase testMethod=test_pi&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_pi(self):<br/>&gt;       from et_xmlfile.xmlfile import ProcessingInstruction<br/><span class="error">E       ImportError: cannot import name &#x27;ProcessingInstruction&#x27; from &#x27;et_xmlfile.xmlfile&#x27; (/Users/Divster/Code/test/venv/lib/python3.8/site-packages/et_xmlfile/xmlfile.py)</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:127: ImportError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_buffering</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_buffering&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_buffering(self):<br/>        with xmlfile(self._file, buffered=False) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>&gt;               self.assertXml(&quot;&lt;test&gt;&quot;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:167: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_buffering&gt;, expected = &#x27;&lt;test&gt;&#x27;, encoding = &#x27;utf8&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In example: EndTag: &#x27;&lt;/&#x27; not found, line 1, column 7 (&lt;string&gt;, line 1)</span><br/><span class="error">E         In actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;Got nothing</span><br/><span class="error">E         </span><br/><span class="error">E       assert &quot;In example: EndTag: &#x27;&lt;/&#x27; not found, line 1, column 7 (&lt;string&gt;, line 1)\nIn actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;Got nothing\n&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_closing_out_of_order_in_error_case</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_closing_out_of_order_in_error_case&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_closing_out_of_order_in_error_case(self):<br/>        cm_exit = None<br/>        try:<br/>            with xmlfile(self._file) as xf:<br/>                x = xf.element(&#x27;test&#x27;)<br/>                cm_exit = x.__exit__<br/>                x.__enter__()<br/>                raise ValueError(&#x27;123&#x27;)<br/>        except ValueError:<br/>            self.assertTrue(cm_exit)<br/>            try:<br/>                cm_exit(ValueError, ValueError(&quot;huhu&quot;), None)<br/>            except LxmlSyntaxError:<br/>                self.assertTrue(True)<br/>            else:<br/>&gt;               self.assertTrue(False)<br/><span class="error">E               AssertionError: False is not true</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:242: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_comment</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_comment&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_comment(self):<br/>        with xmlfile(self._file) as xf:<br/>&gt;           xf.write(etree.Comment(&#x27;a comment&#x27;))<br/><span class="error">E           NameError: name &#x27;etree&#x27; is not defined</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:137: NameError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_encoding</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_encoding&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_encoding(self):<br/>        with xmlfile(self._file, encoding=&#x27;utf16&#x27;) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>                xf.write(&#x27;toast&#x27;)<br/>&gt;       self.assertXml(&#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding=&#x27;utf16&#x27;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:161: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_encoding&gt;, expected = &#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding = &#x27;utf16&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;toast&lt;/test&gt;Got:</span><br/><span class="error">E             琼獥㹴潴獡㱴琯獥㹴</span><br/><span class="error">E       assert &quot;In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;toast&lt;/test&gt;Got:\n    琼獥㹴潴獡㱴琯獥㹴&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_flush</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_flush&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_flush(self):<br/>        with xmlfile(self._file, buffered=True) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>&gt;               self.assertXml(&quot;&quot;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:184: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_flush&gt;, expected = &#x27;&#x27;, encoding = &#x27;utf8&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In example: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         In actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected nothing</span><br/><span class="error">E         Got nothing</span><br/><span class="error">E         </span><br/><span class="error">E       assert &#x27;In example: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nIn actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nExpected nothing\nGot nothing\n&#x27; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_pi</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.BytesIOXmlFileTestCase testMethod=test_pi&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_pi(self):<br/>&gt;       from et_xmlfile.xmlfile import ProcessingInstruction<br/><span class="error">E       ImportError: cannot import name &#x27;ProcessingInstruction&#x27; from &#x27;et_xmlfile.xmlfile&#x27; (/Users/Divster/Code/test/venv/lib/python3.8/site-packages/et_xmlfile/xmlfile.py)</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:127: ImportError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_buffering</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_buffering&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_buffering(self):<br/>        with xmlfile(self._file, buffered=False) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>&gt;               self.assertXml(&quot;&lt;test&gt;&quot;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:167: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_buffering&gt;, expected = &#x27;&lt;test&gt;&#x27;, encoding = &#x27;utf8&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In example: EndTag: &#x27;&lt;/&#x27; not found, line 1, column 7 (&lt;string&gt;, line 1)</span><br/><span class="error">E         In actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;Got nothing</span><br/><span class="error">E         </span><br/><span class="error">E       assert &quot;In example: EndTag: &#x27;&lt;/&#x27; not found, line 1, column 7 (&lt;string&gt;, line 1)\nIn actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;Got nothing\n&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_closing_out_of_order_in_error_case</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_closing_out_of_order_in_error_case&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_closing_out_of_order_in_error_case(self):<br/>        cm_exit = None<br/>        try:<br/>            with xmlfile(self._file) as xf:<br/>                x = xf.element(&#x27;test&#x27;)<br/>                cm_exit = x.__exit__<br/>                x.__enter__()<br/>                raise ValueError(&#x27;123&#x27;)<br/>        except ValueError:<br/>            self.assertTrue(cm_exit)<br/>            try:<br/>                cm_exit(ValueError, ValueError(&quot;huhu&quot;), None)<br/>            except LxmlSyntaxError:<br/>                self.assertTrue(True)<br/>            else:<br/>&gt;               self.assertTrue(False)<br/><span class="error">E               AssertionError: False is not true</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:242: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_comment</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_comment&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_comment(self):<br/>        with xmlfile(self._file) as xf:<br/>&gt;           xf.write(etree.Comment(&#x27;a comment&#x27;))<br/><span class="error">E           NameError: name &#x27;etree&#x27; is not defined</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:137: NameError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_encoding</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_encoding&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_encoding(self):<br/>        with xmlfile(self._file, encoding=&#x27;utf16&#x27;) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>                xf.write(&#x27;toast&#x27;)<br/>&gt;       self.assertXml(&#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding=&#x27;utf16&#x27;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:161: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_encoding&gt;, expected = &#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding = &#x27;utf16&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;toast&lt;/test&gt;Got:</span><br/><span class="error">E             琼獥㹴潴獡㱴琯獥㹴</span><br/><span class="error">E       assert &quot;In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;toast&lt;/test&gt;Got:\n    琼獥㹴潴獡㱴琯獥㹴&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_flush</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_flush&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_flush(self):<br/>        with xmlfile(self._file, buffered=True) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>&gt;               self.assertXml(&quot;&quot;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:184: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_flush&gt;, expected = &#x27;&#x27;, encoding = &#x27;utf8&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In example: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         In actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected nothing</span><br/><span class="error">E         Got nothing</span><br/><span class="error">E         </span><br/><span class="error">E       assert &#x27;In example: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nIn actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nExpected nothing\nGot nothing\n&#x27; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_pi</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempXmlFileTestCase testMethod=test_pi&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_pi(self):<br/>&gt;       from et_xmlfile.xmlfile import ProcessingInstruction<br/><span class="error">E       ImportError: cannot import name &#x27;ProcessingInstruction&#x27; from &#x27;et_xmlfile.xmlfile&#x27; (/Users/Divster/Code/test/venv/lib/python3.8/site-packages/et_xmlfile/xmlfile.py)</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:127: ImportError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_closing_out_of_order_in_error_case</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempPathXmlFileTestCase testMethod=test_closing_out_of_order_in_error_case&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_closing_out_of_order_in_error_case(self):<br/>        cm_exit = None<br/>        try:<br/>            with xmlfile(self._file) as xf:<br/>                x = xf.element(&#x27;test&#x27;)<br/>                cm_exit = x.__exit__<br/>                x.__enter__()<br/>                raise ValueError(&#x27;123&#x27;)<br/>        except ValueError:<br/>            self.assertTrue(cm_exit)<br/>            try:<br/>                cm_exit(ValueError, ValueError(&quot;huhu&quot;), None)<br/>            except LxmlSyntaxError:<br/>                self.assertTrue(True)<br/>            else:<br/>&gt;               self.assertTrue(False)<br/><span class="error">E               AssertionError: False is not true</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:242: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_comment</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempPathXmlFileTestCase testMethod=test_comment&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_comment(self):<br/>        with xmlfile(self._file) as xf:<br/>&gt;           xf.write(etree.Comment(&#x27;a comment&#x27;))<br/><span class="error">E           NameError: name &#x27;etree&#x27; is not defined</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:137: NameError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_encoding</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempPathXmlFileTestCase testMethod=test_encoding&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_encoding(self):<br/>        with xmlfile(self._file, encoding=&#x27;utf16&#x27;) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>                xf.write(&#x27;toast&#x27;)<br/>&gt;       self.assertXml(&#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding=&#x27;utf16&#x27;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:161: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempPathXmlFileTestCase testMethod=test_encoding&gt;, expected = &#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding = &#x27;utf16&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;toast&lt;/test&gt;Got:</span><br/><span class="error">E             琼獥㹴潴獡㱴琯獥㹴</span><br/><span class="error">E       assert &quot;In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;toast&lt;/test&gt;Got:\n    琼獥㹴潴獡㱴琯獥㹴&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_pi</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.TempPathXmlFileTestCase testMethod=test_pi&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_pi(self):<br/>&gt;       from et_xmlfile.xmlfile import ProcessingInstruction<br/><span class="error">E       ImportError: cannot import name &#x27;ProcessingInstruction&#x27; from &#x27;et_xmlfile.xmlfile&#x27; (/Users/Divster/Code/test/venv/lib/python3.8/site-packages/et_xmlfile/xmlfile.py)</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:127: ImportError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_buffering</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_buffering&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_buffering(self):<br/>        with xmlfile(self._file, buffered=False) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>&gt;               self.assertXml(&quot;&lt;test&gt;&quot;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:167: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_buffering&gt;, expected = &#x27;&lt;test&gt;&#x27;, encoding = &#x27;utf8&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In example: EndTag: &#x27;&lt;/&#x27; not found, line 1, column 7 (&lt;string&gt;, line 1)</span><br/><span class="error">E         In actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;Got nothing</span><br/><span class="error">E         </span><br/><span class="error">E       assert &quot;In example: EndTag: &#x27;&lt;/&#x27; not found, line 1, column 7 (&lt;string&gt;, line 1)\nIn actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;Got nothing\n&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_closing_out_of_order_in_error_case</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_closing_out_of_order_in_error_case&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_closing_out_of_order_in_error_case(self):<br/>        cm_exit = None<br/>        try:<br/>            with xmlfile(self._file) as xf:<br/>                x = xf.element(&#x27;test&#x27;)<br/>                cm_exit = x.__exit__<br/>                x.__enter__()<br/>                raise ValueError(&#x27;123&#x27;)<br/>        except ValueError:<br/>            self.assertTrue(cm_exit)<br/>            try:<br/>                cm_exit(ValueError, ValueError(&quot;huhu&quot;), None)<br/>            except LxmlSyntaxError:<br/>                self.assertTrue(True)<br/>            else:<br/>&gt;               self.assertTrue(False)<br/><span class="error">E               AssertionError: False is not true</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:242: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_comment</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_comment&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_comment(self):<br/>        with xmlfile(self._file) as xf:<br/>&gt;           xf.write(etree.Comment(&#x27;a comment&#x27;))<br/><span class="error">E           NameError: name &#x27;etree&#x27; is not defined</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:137: NameError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_encoding</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_encoding&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_encoding(self):<br/>        with xmlfile(self._file, encoding=&#x27;utf16&#x27;) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>                xf.write(&#x27;toast&#x27;)<br/>&gt;       self.assertXml(&#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding=&#x27;utf16&#x27;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:161: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_encoding&gt;, expected = &#x27;&lt;test&gt;toast&lt;/test&gt;&#x27;, encoding = &#x27;utf16&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected:</span><br/><span class="error">E             &lt;test&gt;toast&lt;/test&gt;Got:</span><br/><span class="error">E             琼獥㹴潴獡㱴琯獥㹴</span><br/><span class="error">E       assert &quot;In actual output: Start tag expected, &#x27;&lt;&#x27; not found, line 1, column 1 (&lt;string&gt;, line 1)\nExpected:\n    &lt;test&gt;toast&lt;/test&gt;Got:\n    琼獥㹴潴獡㱴琯獥㹴&quot; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_flush</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_flush&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_flush(self):<br/>        with xmlfile(self._file, buffered=True) as xf:<br/>            with xf.element(&#x27;test&#x27;):<br/>&gt;               self.assertXml(&quot;&quot;)<br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:184: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_flush&gt;, expected = &#x27;&#x27;, encoding = &#x27;utf8&#x27;<br/><br/>    def assertXml(self, expected, encoding=&#x27;utf8&#x27;):<br/>        diff = compare_xml(self._read_file().decode(encoding), expected)<br/>&gt;       assert diff is None, diff<br/><span class="error">E       AssertionError: In example: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         In actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)</span><br/><span class="error">E         Expected nothing</span><br/><span class="error">E         Got nothing</span><br/><span class="error">E         </span><br/><span class="error">E       assert &#x27;In example: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nIn actual output: Document is empty, line 1, column 1 (&lt;string&gt;, line 1)\nExpected nothing\nGot nothing\n&#x27; is None</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:268: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="xfailed results-table-row">
+        <tr>
+          <td class="col-result">XFailed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_pi</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;et_xmlfile.tests.test_incremental_xmlfile.SimpleFileLikeXmlFileTestCase testMethod=test_pi&gt;<br/><br/>    @pytest.mark.xfail<br/>    def test_pi(self):<br/>&gt;       from et_xmlfile.xmlfile import ProcessingInstruction<br/><span class="error">E       ImportError: cannot import name &#x27;ProcessingInstruction&#x27; from &#x27;et_xmlfile.xmlfile&#x27; (/Users/Divster/Code/test/venv/lib/python3.8/site-packages/et_xmlfile/xmlfile.py)</span><br/><br/>lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py:127: ImportError<br/></div></td></tr></tbody>
+      <tbody class="skipped results-table-row">
+        <tr>
+          <td class="col-result">Skipped</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_buffering</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">(&#x27;lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py&#x27;, 307, &#x27;Skipped: temp file behaviour is too platform specific here&#x27;)<br/></div></td></tr></tbody>
+      <tbody class="skipped results-table-row">
+        <tr>
+          <td class="col-result">Skipped</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_flush</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">(&#x27;lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py&#x27;, 311, &#x27;Skipped: temp file behaviour is too platform specific here&#x27;)<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_login.py::TestLogin::test_login</td>
+          <td class="col-duration">4.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_anonymous_namespace</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_attribute</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_element_nested</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_element_nested_with_text</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_element_write_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_escaping</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_failure_preceding_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_failure_trailing_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_failure_trailing_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_namespace_nested_anonymous</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_namespace_nested_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_namespace_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_nested_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_write_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::_XmlFileTestCaseBase::test_write_Element_repeatedly</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_anonymous_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_attribute</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_element_nested</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_element_nested_with_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_element_write_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_escaping</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_failure_preceding_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_failure_trailing_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_failure_trailing_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_filelike_close</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_namespace_nested_anonymous</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_namespace_nested_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_namespace_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_nested_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_write_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::BytesIOXmlFileTestCase::test_write_Element_repeatedly</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_anonymous_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_attribute</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_element_nested</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_element_nested_with_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_element_write_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_escaping</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_failure_preceding_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_failure_trailing_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_failure_trailing_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_namespace_nested_anonymous</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_namespace_nested_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_namespace_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_nested_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_write_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempXmlFileTestCase::test_write_Element_repeatedly</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_anonymous_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_attribute</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_element_nested</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_element_nested_with_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_element_write_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_escaping</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_failure_preceding_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_failure_trailing_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_failure_trailing_text</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_namespace_nested_anonymous</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_namespace_nested_nsmap</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_namespace_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_nested_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_write_Element</td>
+          <td class="col-duration">0.01</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::TempPathXmlFileTestCase::test_write_Element_repeatedly</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_anonymous_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_attribute</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_element_nested</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_element_nested_with_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_element_write_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_escaping</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_failure_preceding_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_failure_trailing_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_failure_trailing_text</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_filelike_close</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_filelike_not_closing</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_namespace_nested_anonymous</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_namespace_nested_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_namespace_nsmap</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_nested_default_namespace</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_write_Element</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/et_xmlfile/tests/test_incremental_xmlfile.py::SimpleFileLikeXmlFileTestCase::test_write_Element_repeatedly</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/wcwidth/tests/test_core.py::test_hello_jp</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/wcwidth/tests/test_core.py::test_wcswidth_substr</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/wcwidth/tests/test_core.py::test_null_width_0</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/wcwidth/tests/test_core.py::test_control_c0_width_negative_1</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/wcwidth/tests/test_core.py::test_combining_width_negative_1</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/wcwidth/tests/test_core.py::test_combining_cafe</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/wcwidth/tests/test_core.py::test_combining_enclosing</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">lib/python3.8/site-packages/wcwidth/tests/test_core.py::test_combining_spacing</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody></table></body></html>
